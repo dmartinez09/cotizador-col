@@ -71,18 +71,18 @@ async function startServer() {
   }
 
   // Azure App Service sets PORT env variable
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = process.env.NODE_ENV === "production"
-    ? preferredPort
-    : await findAvailablePort(preferredPort);
+  const preferredPort = parseInt(process.env.PORT || process.env.WEBSITES_PORT || "8080");
+const port = process.env.NODE_ENV === "production"
+  ? preferredPort
+  : await findAvailablePort(preferredPort);
 
-  if (port !== preferredPort && process.env.NODE_ENV !== "production") {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
+if (port !== preferredPort && process.env.NODE_ENV !== "production") {
+  console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+}
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 }
 
 startServer().catch(console.error);
