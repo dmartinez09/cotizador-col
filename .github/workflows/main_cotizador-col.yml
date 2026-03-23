@@ -39,14 +39,7 @@ jobs:
         run: |
           mkdir -p release
           cp package.json release/
-          cp pnpm-lock.yaml release/
           cp -R dist release/dist
-          cp -R patches release/patches
-
-      - name: Install production dependencies in release
-        run: |
-          cd release
-          pnpm install --prod --no-frozen-lockfile
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
