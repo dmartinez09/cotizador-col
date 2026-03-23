@@ -41,6 +41,7 @@ jobs:
           cp package.json release/
           cp pnpm-lock.yaml release/
           cp -R dist release/dist
+          cp -R patches release/patches
 
       - name: Install production dependencies in release
         run: |
