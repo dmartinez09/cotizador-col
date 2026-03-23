@@ -1,0 +1,18 @@
+============================================================
+Point Colombia — Configuración de Variables de Entorno
+Crea un archivo .env en la raíz del proyecto con estos valores
+============================================================
+
+DATABASE_URL=mysql://root:tu_password@localhost:3306/point_colombia
+JWT_SECRET=cambia_esto_por_un_secreto_muy_largo_y_seguro
+VITE_APP_ID=local-dev-app
+OAUTH_SERVER_URL=http://localhost:3000
+VITE_OAUTH_PORTAL_URL=http://localhost:3000
+OWNER_OPEN_ID=admin-local
+OWNER_NAME=Administrador
+BUILT_IN_FORGE_API_URL=http://localhost:3000
+BUILT_IN_FORGE_API_KEY=local-key
+VITE_FRONTEND_FORGE_API_KEY=local-key
+VITE_FRONTEND_FORGE_API_URL=http://localhost:3000
+VITE_ANALYTICS_ENDPOINT=
+VITE_ANALYTICS_WEBSITE_ID=

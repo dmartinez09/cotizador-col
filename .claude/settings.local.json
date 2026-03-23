@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest run server/approval.test.ts)",
+      "Bash(pnpm vitest run server/approval.test.ts)",
+      "Bash(where node)",
+      "Bash(where npm)",
+      "Bash(cmd /c \"where node && where npm && where pnpm\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\diego.martinez\\\\OneDrive - Point Americas\\\\Documents\\\\point_colombia_cotizador && where pnpm\")",
+      "Bash(cmd /c \"where node 2>&1\")",
+      "Bash(cmd /c \"node --version\")",
+      "Bash(node --version)"
+    ]
+  }
+}
