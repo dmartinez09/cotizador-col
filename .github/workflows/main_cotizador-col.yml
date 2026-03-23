@@ -35,11 +35,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Prepare release package
-        run: |
-          mkdir -p release
-          cp package.json release/
-          cp -R dist release/dist
+      - name: Prepare release package with pnpm deploy
+        run: pnpm deploy --prod release
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
