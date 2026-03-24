@@ -3,8 +3,10 @@ import fs from "fs";
 import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
-import { createServer as createViteServer } from "vite";
-import viteConfig from "../../vite.config";
+
+// ❌ ELIMINAMOS LAS IMPORTACIONES ESTÁTICAS DE VITE Y SU CONFIGURACIÓN
+// import { createServer as createViteServer } from "vite";
+// import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -13,6 +15,11 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  // ✅ 1. IMPORTACIÓN DINÁMICA: Solo se ejecuta si llamamos a esta función (en desarrollo)
+  const { createServer: createViteServer } = await import("vite");
+  const { default: viteConfig } = await import("../../vite.config");
+
+  // ✅ 2. Usamos las variables importadas dinámicamente
   const vite = await createViteServer({
     ...viteConfig,
     configFile: false,
