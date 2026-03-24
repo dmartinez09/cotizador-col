@@ -11,7 +11,7 @@ import { registerLocalAuthRoutes } from "../routes/authRoutes";
 import { registerPdfRoutes } from "../routes/pdfRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./serveStatic";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -65,10 +65,11 @@ async function startServer() {
   );
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  const { setupVite } = await import("./vite");
+  await setupVite(app, server);
+} else {
+  serveStatic(app);
+}
 
   // Azure App Service sets PORT env variable
   const preferredPort = parseInt(process.env.PORT || process.env.WEBSITES_PORT || "8080");
