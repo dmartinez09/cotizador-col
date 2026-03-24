@@ -17,7 +17,9 @@ export async function setupVite(app: Express, server: Server) {
 
   // ✅ 1. IMPORTACIÓN DINÁMICA: Solo se ejecuta si llamamos a esta función (en desarrollo)
   const { createServer: createViteServer } = await import("vite");
-  const { default: viteConfig } = await import("../../vite.config");
+  // Al usar path.resolve, ocultamos la ruta estática para que Esbuild no la empaquete
+  const configPath = path.resolve(process.cwd(), "vite.config.ts");
+  const { default: viteConfig } = await import(configPath);
 
   // ✅ 2. Usamos las variables importadas dinámicamente
   const vite = await createViteServer({
