@@ -1,6 +1,6 @@
 /**
  * Seed script: Crea datos iniciales en la base de datos.
- * - Usuario admin con contraseña
+ * - Usuarios de sistema (admin, gerente, coordinador, vendedores) con contraseña unificada
  * - Configuración de márgenes por defecto
  * - Productos de ejemplo
  * - Clientes de ejemplo
@@ -15,7 +15,7 @@ import {
   products,
   clients,
   marginSettings,
-} from "../drizzle/schema";
+} from "../shared/schema"; // Asegúrate de que la ruta apunte a tu schema actualizado
 import { hashPassword } from "./services/authService";
 
 async function seed() {
@@ -28,73 +28,49 @@ async function seed() {
   console.log("Conectando a la base de datos...");
   const db = drizzle(databaseUrl);
 
-  // ===== 1. ADMIN USER =====
-  console.log("\n--- Creando usuario admin ---");
-  const adminEmail = process.env.ADMIN_EMAIL || "admin@pointcolombia.com";
-  const adminPassword = process.env.ADMIN_PASSWORD || "Point2026!";
-  const adminName = process.env.ADMIN_NAME || "Administrador";
+  const defaultPassword = "Point2026";
+  const hashedPassword = hashPassword(defaultPassword);
 
-  const existingAdmin = await db
-    .select()
-    .from(users)
-    .where(eq(users.email, adminEmail))
-    .limit(1);
-
-  if (existingAdmin.length > 0) {
-    console.log(`  Usuario admin ya existe (${adminEmail}), actualizando...`);
-    await db
-      .update(users)
-      .set({
-        passwordHash: hashPassword(adminPassword),
-        role: "admin",
-        isActive: 1,
-        name: adminName,
-      })
-      .where(eq(users.email, adminEmail));
-  } else {
-    console.log(`  Creando usuario admin: ${adminEmail}`);
-    await db.insert(users).values({
-      openId: `local_${adminEmail}`,
-      name: adminName,
-      email: adminEmail,
-      passwordHash: hashPassword(adminPassword),
-      role: "admin",
-      loginMethod: "local",
-      isActive: 1,
-    });
-  }
-  console.log(`  Admin: ${adminEmail} / ${adminPassword}`);
-
-  // ===== 2. USUARIOS DE EJEMPLO =====
-  console.log("\n--- Creando usuarios de ejemplo ---");
-  const sampleUsers = [
-    { name: "Gerente General", email: "gerente@pointcolombia.com", role: "gerente" as const },
-    { name: "Coordinadora Comercial", email: "coordinadora@pointcolombia.com", role: "coordinador" as const },
-    { name: "Vendedor 1", email: "vendedor1@pointcolombia.com", role: "vendedor" as const },
-    { name: "Vendedor 2", email: "vendedor2@pointcolombia.com", role: "vendedor" as const },
-    { name: "Vendedor 3", email: "vendedor3@pointcolombia.com", role: "vendedor" as const },
+  // ===== 1. USUARIOS DEL SISTEMA =====
+  console.log("\n--- Creando usuarios del sistema ---");
+  const systemUsers = [
+    { username: "admin", name: "Administrador del Sistema", role: "admin" as const },
+    { username: "gerente", name: "Gerencia Point", role: "gerente" as const },
+    { username: "coordinadora", name: "Coordinación Comercial", role: "coordinador" as const },
+    { username: "vendedor1", name: "Vendedor 1", role: "vendedor" as const },
+    { username: "vendedor2", name: "Vendedor 2", role: "vendedor" as const },
+    { username: "vendedor3", name: "Vendedor 3", role: "vendedor" as const },
   ];
 
-  for (const u of sampleUsers) {
-    const existing = await db.select().from(users).where(eq(users.email, u.email)).limit(1);
+  for (const u of systemUsers) {
+    const existing = await db.select().from(users).where(eq(users.username, u.username)).limit(1);
+    
     if (existing.length > 0) {
-      console.log(`  Usuario ${u.email} ya existe, omitiendo.`);
+      console.log(`  Usuario [${u.username}] ya existe, actualizando contraseña y rol...`);
+      await db
+        .update(users)
+        .set({
+          passwordHash: hashedPassword,
+          role: u.role,
+          isActive: 1,
+          name: u.name,
+        })
+        .where(eq(users.username, u.username));
     } else {
-      const defaultPassword = "Point2026!";
       await db.insert(users).values({
-        openId: `local_${u.email}`,
+        openId: `local_${u.username}`,
         name: u.name,
-        email: u.email,
-        passwordHash: hashPassword(defaultPassword),
+        username: u.username,
+        passwordHash: hashedPassword,
         role: u.role,
         loginMethod: "local",
         isActive: 1,
       });
-      console.log(`  Creado: ${u.name} (${u.email}) [${u.role}] — pass: ${defaultPassword}`);
+      console.log(`  ✅ Creado: ${u.username} [Rol: ${u.role}]`);
     }
   }
 
-  // ===== 3. CONFIGURACIÓN DE MÁRGENES =====
+  // ===== 2. CONFIGURACIÓN DE MÁRGENES =====
   console.log("\n--- Configuración de márgenes ---");
   const existingMargins = await db.select().from(marginSettings).limit(1);
   if (existingMargins.length > 0) {
@@ -105,10 +81,10 @@ async function seed() {
       yellowMax: 3200,
       tolerance: 200,
     });
-    console.log("  Márgenes por defecto: rojo < 1000, amarillo 1000-3200, verde >= 3200");
+    console.log("  ✅ Márgenes por defecto creados.");
   }
 
-  // ===== 4. PRODUCTOS DE EJEMPLO =====
+  // ===== 3. PRODUCTOS DE EJEMPLO =====
   console.log("\n--- Productos de ejemplo ---");
   const existingProducts = await db.select().from(products).limit(1);
   if (existingProducts.length > 0) {
@@ -128,10 +104,10 @@ async function seed() {
     ];
 
     await db.insert(products).values(sampleProducts);
-    console.log(`  Creados ${sampleProducts.length} productos de ejemplo.`);
+    console.log(`  ✅ Creados ${sampleProducts.length} productos de ejemplo.`);
   }
 
-  // ===== 5. CLIENTES DE EJEMPLO =====
+  // ===== 4. CLIENTES DE EJEMPLO =====
   console.log("\n--- Clientes de ejemplo ---");
   const existingClients = await db.select().from(clients).limit(1);
   if (existingClients.length > 0) {
@@ -149,16 +125,16 @@ async function seed() {
     ];
 
     await db.insert(clients).values(sampleClients);
-    console.log(`  Creados ${sampleClients.length} clientes de ejemplo.`);
+    console.log(`  ✅ Creados ${sampleClients.length} clientes de ejemplo.`);
   }
 
   console.log("\n========================================");
   console.log("Seed completado exitosamente!");
   console.log("========================================\n");
-  console.log("Credenciales:");
-  console.log(`  Admin: ${adminEmail} / ${adminPassword}`);
-  console.log("  Demás usuarios: [email]@pointcolombia.com / Point2026!");
-  console.log("");
+  console.log("Credenciales de Acceso:");
+  console.log("  Usuarios: admin, gerente, coordinadora, vendedor1, vendedor2, vendedor3");
+  console.log(`  Contraseña universal: ${defaultPassword}`);
+  console.log("========================================\n");
 
   process.exit(0);
 }
