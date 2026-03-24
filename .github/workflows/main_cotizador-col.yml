@@ -35,8 +35,18 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Prepare release package with pnpm deploy
-        run: pnpm deploy --prod release
+      - name: Prepare release package
+        run: |
+          mkdir -p release
+          cp package.json release/
+          cp pnpm-lock.yaml release/
+          cp -R dist release/dist
+          cp -R patches release/patches
+
+      - name: Install production dependencies in release (hoisted)
+        run: |
+          cd release
+          pnpm install --prod --no-frozen-lockfile --config.node-linker=hoisted
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
