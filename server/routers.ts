@@ -223,11 +223,9 @@ export const appRouter = router({
   // ===== COTIZACIONES =====
   quotations: router({
     list: protectedProcedure.query(async ({ ctx }) => {
-      // Vendedores solo ven sus propias cotizaciones
       if (ctx.user.role === "vendedor") {
         return await db.getQuotationsByVendor(ctx.user.id);
       }
-      // Coordinadores, gerentes y admins ven todas
       return await db.getAllQuotations();
     }),
 
@@ -238,12 +236,9 @@ export const appRouter = router({
         if (!quotation) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-
-        // Vendedores solo pueden ver sus propias cotizaciones
         if (ctx.user.role === "vendedor" && quotation.vendorId !== ctx.user.id) {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
-
         return quotation;
       }),
 
@@ -253,12 +248,10 @@ export const appRouter = router({
         return await db.getQuotationItems(input.quotationId);
       }),
 
-    // Histórico de cotizaciones por cliente
     byClient: protectedProcedure
       .input(z.object({ clientId: z.number() }))
       .query(async ({ input, ctx }) => {
         const all = await db.getQuotationsByClient(input.clientId);
-        // Vendedores solo ven las suyas
         if (ctx.user.role === "vendedor") {
           return all.filter(q => q.vendorId === ctx.user.id);
         }
@@ -285,15 +278,11 @@ export const appRouter = router({
       }))
       .mutation(async ({ input, ctx }) => {
         const { items, ...quotationData } = input;
-
-        // Obtener configuración de márgenes para determinar el paso de aprobación
         const settings = await db.getMarginSettings();
         const redMax = settings?.redMax ?? 1000;
         const yellowMax = settings?.yellowMax ?? 3200;
-
         const approvalStep = getInitialApprovalStep(quotationData.grossMargin, redMax, yellowMax);
 
-        // Crear cotización
         const result = await db.createQuotation({
           ...quotationData,
           vendorId: ctx.user.id,
@@ -301,8 +290,6 @@ export const appRouter = router({
         });
 
         const quotationId = Number((result as any).insertId);
-
-        // Crear items
         const itemsWithQuotationId = items.map(item => ({
           ...item,
           quotationId,
@@ -310,7 +297,6 @@ export const appRouter = router({
 
         await db.bulkInsertQuotationItems(itemsWithQuotationId);
 
-        // Auditoría
         await db.createAuditLog({
           userId: ctx.user.id,
           entity: "quotation",
@@ -322,13 +308,6 @@ export const appRouter = router({
         return { success: true, quotationId };
       }),
 
-    /**
-     * Aprobación escalonada — delegada al servicio centralizado.
-     * Verde: coordinador/gerente/admin aprueba directo.
-     * Amarillo: coordinadora → gerente (dos pasos).
-     * Rojo: gerente/admin directo.
-     * Admin siempre puede aprobar.
-     */
     approve: coordinadorOrAboveProcedure
       .input(z.object({ id: z.number(), comment: z.string().optional() }))
       .mutation(async ({ input, ctx }) => {
@@ -340,241 +319,3 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         return await rejectQuotation(input.id, ctx.user, input.comment);
       }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        const quotation = await db.getQuotationById(input.id);
-        if (!quotation) {
-          throw new TRPCError({ code: "NOT_FOUND" });
-        }
-
-        // Solo el vendedor que creó la cotización (pendiente) o un admin puede eliminarla
-        if (ctx.user.role !== "admin" && quotation.vendorId !== ctx.user.id) {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
-
-        // Solo se puede eliminar si está pendiente (a menos que sea admin)
-        if (quotation.status !== "pendiente" && ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Solo se pueden eliminar cotizaciones pendientes" });
-        }
-
-        // Soft delete — no eliminamos items, solo marcamos la cotización como inactiva
-        await db.softDeleteQuotation(input.id);
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "quotation",
-          entityId: input.id,
-          action: "delete",
-        });
-        return { success: true };
-      }),
-
-    // Historial de aprobaciones de una cotización
-    approvalHistory: protectedProcedure
-      .input(z.object({ quotationId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getApprovalHistory(input.quotationId);
-      }),
-
-    // Registrar que se generó/imprimió un PDF
-    logPdfAction: protectedProcedure
-      .input(z.object({ quotationId: z.number(), action: z.enum(["print", "download"]) }))
-      .mutation(async ({ input, ctx }) => {
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "quotation",
-          entityId: input.quotationId,
-          action: `pdf_${input.action}`,
-        });
-        return { success: true };
-      }),
-  }),
-
-  // ===== USUARIOS =====
-  users: router({
-    list: adminProcedure.query(async () => {
-      return await db.getAllUsers();
-    }),
-
-    // Lista básica para resolución de nombres (todos los roles autenticados)
-    listBasic: protectedProcedure.query(async () => {
-      const allUsers = await db.getAllUsers();
-      return allUsers.map(u => ({ id: u.id, name: u.name, role: u.role }));
-    }),
-
-    // Crear usuario con contraseña (solo admin)
-    create: adminProcedure
-      .input(z.object({
-        name: z.string().min(2, "El nombre debe tener al menos 2 caracteres"),
-        email: z.string().email("Email inválido"),
-        password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
-        role: z.enum(["vendedor", "coordinador", "gerente", "admin"]),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        // Verificar que el email no exista
-        const existing = await db.getUserByEmail(input.email);
-        if (existing) {
-          throw new TRPCError({ code: "CONFLICT", message: "Ya existe un usuario con ese email" });
-        }
-
-        // Validar fortaleza de contraseña
-        const strength = validatePasswordStrength(input.password);
-        if (!strength.valid) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: strength.message });
-        }
-
-        const passwordHash = hashPassword(input.password);
-        // Usar el email como openId para usuarios locales
-        const openId = `local_${input.email}`;
-
-        await db.upsertUser({
-          openId,
-          name: input.name,
-          email: input.email,
-          passwordHash,
-          role: input.role,
-          loginMethod: "local",
-        });
-
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "user",
-          action: "create",
-          details: JSON.stringify({ name: input.name, email: input.email, role: input.role }),
-        });
-
-        return { success: true };
-      }),
-
-    updateRole: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        role: z.enum(["vendedor", "coordinador", "gerente", "admin"]),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        await db.updateUserRole(input.id, input.role);
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "user",
-          entityId: input.id,
-          action: "update_role",
-          details: JSON.stringify({ newRole: input.role }),
-        });
-        return { success: true };
-      }),
-
-    // Resetear contraseña de un usuario (solo admin)
-    resetPassword: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        newPassword: z.string().min(8),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const strength = validatePasswordStrength(input.newPassword);
-        if (!strength.valid) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: strength.message });
-        }
-
-        const passwordHash = hashPassword(input.newPassword);
-        await db.updateUserPassword(input.id, passwordHash);
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "user",
-          entityId: input.id,
-          action: "reset_password",
-        });
-        return { success: true };
-      }),
-
-    delete: adminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input, ctx }) => {
-        // Prevenir auto-eliminación
-        if (input.id === ctx.user.id) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "No puede eliminarse a sí mismo" });
-        }
-        await db.deleteUser(input.id);
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "user",
-          entityId: input.id,
-          action: "delete",
-        });
-        return { success: true };
-      }),
-  }),
-
-  // ===== CONFIGURACIÓN DE MÁRGENES =====
-  marginSettings: router({
-    get: protectedProcedure.query(async () => {
-      const settings = await db.getMarginSettings();
-      // Si no hay configuración, devolver valores por defecto
-      return settings || { id: 0, redMax: 1000, yellowMax: 3200, tolerance: 200, updatedBy: null, createdAt: new Date(), updatedAt: new Date() };
-    }),
-
-    update: gerenteOrAdminProcedure
-      .input(z.object({
-        redMax: z.number().min(0).max(10000),
-        yellowMax: z.number().min(0).max(10000),
-        tolerance: z.number().min(0).max(5000),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        if (input.redMax >= input.yellowMax) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "El umbral rojo debe ser menor que el amarillo" });
-        }
-
-        await db.upsertMarginSettings({
-          ...input,
-          updatedBy: ctx.user.id,
-        });
-        await db.createAuditLog({
-          userId: ctx.user.id,
-          entity: "margin_settings",
-          action: "update",
-          details: JSON.stringify(input),
-        });
-        return { success: true };
-      }),
-  }),
-
-  // ===== PDF DOCUMENTS (metadata via tRPC, binarios via Express routes) =====
-  pdfDocuments: router({
-    // Lista PDFs de una cotización
-    listByQuotation: protectedProcedure
-      .input(z.object({ quotationId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        // Vendedores solo acceden a sus cotizaciones
-        if (ctx.user.role === "vendedor") {
-          const quotation = await db.getQuotationById(input.quotationId);
-          if (!quotation || quotation.vendorId !== ctx.user.id) {
-            throw new TRPCError({ code: "FORBIDDEN" });
-          }
-        }
-        return await db.getPdfDocumentsByQuotation(input.quotationId);
-      }),
-
-    getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getPdfDocumentById(input.id);
-      }),
-  }),
-
-  // ===== AUDITORÍA =====
-  audit: router({
-    list: adminProcedure
-      .input(z.object({ limit: z.number().default(100) }).optional())
-      .query(async ({ input }) => {
-        return await db.getAuditLogs(input?.limit ?? 100);
-      }),
-
-    byEntity: adminProcedure
-      .input(z.object({ entity: z.string(), entityId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getAuditLogsByEntity(input.entity, input.entityId);
-      }),
-  }),
-});
-
-export type AppRouter = typeof appRouter;
