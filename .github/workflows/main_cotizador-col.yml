@@ -40,6 +40,8 @@ jobs:
           mkdir -p release
           cp package.json release/
           cp pnpm-lock.yaml release/
+          # Borramos la carpeta dist vieja si existe en el release
+          rm -rf release/dist
           cp -R dist release/dist
           cp -R patches release/patches
 
