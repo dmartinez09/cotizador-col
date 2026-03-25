@@ -6,8 +6,8 @@ import {
   marginSettings, approvalHistory, auditLog, pdfDocuments,
   InsertProduct, InsertClient, InsertQuotation, InsertQuotationItem,
   InsertMarginSettings, InsertApprovalHistory, InsertAuditLog, InsertPdfDocument,
-} from "../drizzle/schema";
-import { ENV } from './_core/env';
+} from "../drizzle/schema.js"; // Asegúrate de mantener el .js aquí si lo usabas
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -37,8 +37,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = { openId: user.openId };
     const updateSet: Record<string, unknown> = {};
 
-    // CAMBIO CRÍTICO 1: Usamos 'username' en lugar de 'email' para que coincida con la BD de Azure
-    const textFields = ["name", "username", "loginMethod"] as const;
+    // CORRECCIÓN: Volvemos a usar 'email' porque esa es la columna física que existe en tu BD
+    const textFields = ["name", "email", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
     const assignNullable = (field: TextField) => {
       const value = (user as any)[field];
@@ -81,14 +81,14 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// CAMBIO CRÍTICO 2: Mantenemos el nombre de la función para no romper authRoutes.ts,
-// pero por dentro le decimos que busque en la columna correcta: users.username
+// CORRECCIÓN DEL TRUCO MAESTRO: 
+// Recibimos "usernameToSearch" (ej: 'admin'), pero lo buscamos FÍSICAMENTE en users.email
 export async function getUserByEmail(usernameToSearch: string) {
   const db = await getDb();
   if (!db) return undefined;
   
-  // ¡Aquí estaba el error! Ahora busca explícitamente en users.username
-  const result = await db.select().from(users).where(and(eq(users.username, usernameToSearch), eq(users.isActive, 1))).limit(1);
+  // ¡Aquí estaba mi error! Volvemos a usar users.email
+  const result = await db.select().from(users).where(and(eq(users.email, usernameToSearch), eq(users.isActive, 1))).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
