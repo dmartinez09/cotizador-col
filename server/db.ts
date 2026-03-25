@@ -23,7 +23,6 @@ export async function getDb() {
   return _db;
 }
 
-// Helper: get raw drizzle instance for transactions
 export async function getDbRaw() {
   return getDb();
 }
@@ -38,13 +37,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = { openId: user.openId };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
+    // CAMBIO CRÍTICO 1: Usamos 'username' en lugar de 'email' para que coincida con la BD de Azure
+    const textFields = ["name", "username", "loginMethod"] as const;
     type TextField = (typeof textFields)[number];
     const assignNullable = (field: TextField) => {
-      const value = user[field];
+      const value = (user as any)[field];
       if (value === undefined) return;
       const normalized = value ?? null;
-      values[field] = normalized;
+      (values as any)[field] = normalized;
       updateSet[field] = normalized;
     };
     textFields.forEach(assignNullable);
@@ -81,10 +81,14 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getUserByEmail(email: string) {
+// CAMBIO CRÍTICO 2: Mantenemos el nombre de la función para no romper authRoutes.ts,
+// pero por dentro le decimos que busque en la columna correcta: users.username
+export async function getUserByEmail(usernameToSearch: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(and(eq(users.email, email), eq(users.isActive, 1))).limit(1);
+  
+  // ¡Aquí estaba el error! Ahora busca explícitamente en users.username
+  const result = await db.select().from(users).where(and(eq(users.username, usernameToSearch), eq(users.isActive, 1))).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
