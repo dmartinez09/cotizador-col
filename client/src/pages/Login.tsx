@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState(""); // CAMBIO: usamos username en vez de email
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +22,8 @@ export default function Login() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        // CAMBIO: enviamos 'username' al backend
+        body: JSON.stringify({ username: username.trim(), password }),
         credentials: "include",
       });
 
@@ -79,77 +80,4 @@ export default function Login() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="correo@empresa.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  disabled={loading}
-                />
-              </div>
-
-              {error && (
-                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-                  {error}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
-                    Iniciando sesión...
-                  </>
-                ) : (
-                  "Iniciar Sesión"
-                )}
-              </Button>
-            </form>
-
-            {hasOAuth && (
-              <>
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">O continúe con</span>
-                  </div>
-                </div>
-
-                <Button variant="outline" className="w-full" asChild>
-                  <a href={getOAuthUrl()}>
-                    Iniciar con OAuth
-                  </a>
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        <p className="text-center text-xs text-muted-foreground">
-          Contacte al administrador si no tiene cuenta de acceso.
-        </p>
-      </div>
-    </div>
-  );
-}
+              <div className="space-y-
