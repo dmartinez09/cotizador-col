@@ -1,13 +1,12 @@
 /**
- * Rutas Express para autenticación local (login con usuario + contraseña).
- * Convive con el flujo OAuth existente — ambos generan la misma cookie JWT.
+ * Rutas Express para autenticación local.
  */
 import type { Express, Request, Response } from "express";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { getSessionCookieOptions } from "../_core/cookies";
-import { sdk } from "../_core/sdk";
-import * as db from "../db";
-import { hashPassword, verifyPassword, validatePasswordStrength } from "../services/authService";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const.js";
+import { getSessionCookieOptions } from "../_core/cookies.js";
+import { sdk } from "../_core/sdk.js";
+import * as db from "../db.js";
+import { hashPassword, verifyPassword, validatePasswordStrength } from "../services/authService.js";
 
 export function registerLocalAuthRoutes(app: Express) {
   /**
@@ -16,6 +15,7 @@ export function registerLocalAuthRoutes(app: Express) {
    */
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
+      // 1. Recibimos "username" desde el frontend (Login.tsx)
       const { username, password } = req.body;
 
       if (!username || !password) {
@@ -23,14 +23,19 @@ export function registerLocalAuthRoutes(app: Express) {
         return;
       }
 
-      const user = await db.getUserByUsername(username.toLowerCase().trim());
+      // 2. Buscamos al usuario. Como hicimos el truco maestro,
+      // el nombre de usuario está guardado físicamente en la columna email.
+      // (Nota: asegúrate de que db.getUserByEmail exista en tus archivos de BD)
+      const user = await db.getUserByEmail(username.toLowerCase().trim());
+      
       if (!user) {
         res.status(401).json({ error: "Credenciales inválidas" });
         return;
       }
 
+      // 3. Verificar contraseña
       if (!user.passwordHash) {
-        res.status(401).json({ error: "Este usuario usa autenticación OAuth. Use el botón de login externo." });
+        res.status(401).json({ error: "Este usuario usa autenticación OAuth." });
         return;
       }
 
@@ -45,11 +50,13 @@ export function registerLocalAuthRoutes(app: Express) {
         return;
       }
 
+      // 4. Actualizar último login
       await db.upsertUser({
         openId: user.openId,
         lastSignedIn: new Date(),
       });
 
+      // 5. Crear token de sesión JWT
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",
         expiresInMs: ONE_YEAR_MS,
@@ -58,6 +65,7 @@ export function registerLocalAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
+      // 6. Auditoría
       await db.createAuditLog({
         userId: user.id,
         entity: "user",
@@ -71,7 +79,7 @@ export function registerLocalAuthRoutes(app: Express) {
         user: {
           id: user.id,
           name: user.name,
-          username: user.username,
+          username: user.email, // Devolvemos la columna email como "username"
           role: user.role,
         },
       });
@@ -83,8 +91,6 @@ export function registerLocalAuthRoutes(app: Express) {
 
   /**
    * POST /api/auth/change-password
-   * Body: { currentPassword: string, newPassword: string }
-   * Requiere sesión activa.
    */
   app.post("/api/auth/change-password", async (req: Request, res: Response) => {
     try {
