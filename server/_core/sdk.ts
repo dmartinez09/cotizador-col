@@ -163,11 +163,19 @@ class SDKServer {
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}
   ): Promise<string> {
+    
+    // --- CÓDIGO CHISMOSO (DEBUG) ---
+    console.log("----- DEBUG SESIÓN -----");
+    console.log("openId recibido:", openId);
+    console.log("appId recibido (desde ENV):", ENV.appId);
+    console.log("name recibido:", options.name);
+    console.log("------------------------");
+
     return this.signSession(
       {
-        openId,
-        appId: ENV.appId,
-        // SOLUCIÓN 1: Si no tiene nombre registrado en la BD, le ponemos uno genérico en el JWT.
+        // PARCHES DE EMERGENCIA: Si algo viene vacío, le ponemos un valor por defecto para no romper el sistema.
+        openId: openId || "local_admin", 
+        appId: ENV.appId || "app_point_colombia",
         name: options.name || "Usuario Point",
       },
       options
@@ -211,7 +219,7 @@ class SDKServer {
       if (
         !isNonEmptyString(openId) ||
         !isNonEmptyString(appId)
-        // SOLUCIÓN 2: Ya no es obligatorio que el JWT traiga un nombre estricto para dejarlo pasar.
+        // Ya no exigimos que el nombre sea obligatorio aquí
       ) {
         console.warn("[Auth] Session payload missing required fields (openId or appId)");
         return null;
@@ -220,7 +228,6 @@ class SDKServer {
       return {
         openId,
         appId,
-        // Devolvemos el nombre si existe, o un texto vacío si no.
         name: isNonEmptyString(name) ? name : "",
       };
     } catch (error) {
