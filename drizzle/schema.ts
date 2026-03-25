@@ -1,11 +1,13 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 // ===== USERS =====
+// CORRECCIÓN: Volvemos a usar 'email' en lugar de 'username' para que 
+// coincida exactamente con las columnas que existen en la BD de Azure.
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   openId: varchar("openId", { length: 64 }).unique(),
   name: text("name"),
-  username: varchar("username", { length: 255 }).unique().notNull(),
+  email: varchar("email", { length: 320 }).unique().notNull(), // ¡Aquí está la pieza clave!
   passwordHash: varchar("passwordHash", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["vendedor", "coordinador", "gerente", "admin"]).default("vendedor").notNull(),
