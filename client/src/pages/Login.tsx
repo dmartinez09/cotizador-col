@@ -8,7 +8,7 @@ import { toast } from "sonner";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [username, setUsername] = useState(""); // CAMBIO: usamos username en vez de email
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +22,6 @@ export default function Login() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // CAMBIO: enviamos 'username' al backend
         body: JSON.stringify({ username: username.trim(), password }),
         credentials: "include",
       });
@@ -35,7 +34,6 @@ export default function Login() {
       }
 
       toast.success(`Bienvenido, ${data.user.name}`);
-      // Redirigir al dashboard — recargar para que useAuth recoja la cookie
       window.location.href = "/";
     } catch (err) {
       setError("Error de conexión. Intente de nuevo.");
@@ -80,4 +78,77 @@ export default function Login() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-
+              <div className="space-y-2">
+                <Label htmlFor="username">Usuario</Label>
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="ej: admin, vendedor1"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  autoComplete="username"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Contraseña</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  disabled={loading}
+                />
+              </div>
+
+              {error && (
+                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+                  {error}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2" />
+                    Iniciando sesión...
+                  </>
+                ) : (
+                  "Iniciar Sesión"
+                )}
+              </Button>
+            </form>
+
+            {hasOAuth && (
+              <>
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">O continúe con</span>
+                  </div>
+                </div>
+
+                <Button variant="outline" className="w-full" asChild>
+                  <a href={getOAuthUrl()}>
+                    Iniciar con OAuth
+                  </a>
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Contacte al administrador si no tiene cuenta de acceso.
+        </p>
+      </div>
+    </div>
+  );
+}
