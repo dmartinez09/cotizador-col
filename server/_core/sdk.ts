@@ -1,19 +1,20 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { ForbiddenError } from "@shared/_core/errors";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS } from "@shared/const.js";
+import { ForbiddenError } from "@shared/_core/errors.js";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
-import type { User } from "../../drizzle/schema";
-import * as db from "../db";
-import { ENV } from "./env";
+import type { User } from "../../drizzle/schema.js";
+import * as db from "../db.js";
+import { ENV } from "./env.js";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
   GetUserInfoResponse,
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
-} from "./types/manusTypes";
+} from "./types/manusTypes.js";
+
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
@@ -115,8 +116,6 @@ class SDKServer {
 
   /**
    * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
    */
   async exchangeCodeForToken(
     code: string,
@@ -127,8 +126,6 @@ class SDKServer {
 
   /**
    * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
    */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
     const data = await this.oauthService.getUserInfoByToken({
@@ -161,8 +158,6 @@ class SDKServer {
 
   /**
    * Create a session token for a Manus user openId
-   * @example
-   * const sessionToken = await sdk.createSessionToken(userInfo.openId);
    */
   async createSessionToken(
     openId: string,
@@ -172,7 +167,8 @@ class SDKServer {
       {
         openId,
         appId: ENV.appId,
-        name: options.name || "",
+        // SOLUCIÓN 1: Si no tiene nombre registrado en la BD, le ponemos uno genérico en el JWT.
+        name: options.name || "Usuario Point",
       },
       options
     );
@@ -214,17 +210,18 @@ class SDKServer {
 
       if (
         !isNonEmptyString(openId) ||
-        !isNonEmptyString(appId) ||
-        !isNonEmptyString(name)
+        !isNonEmptyString(appId)
+        // SOLUCIÓN 2: Ya no es obligatorio que el JWT traiga un nombre estricto para dejarlo pasar.
       ) {
-        console.warn("[Auth] Session payload missing required fields");
+        console.warn("[Auth] Session payload missing required fields (openId or appId)");
         return null;
       }
 
       return {
         openId,
         appId,
-        name,
+        // Devolvemos el nombre si existe, o un texto vacío si no.
+        name: isNonEmptyString(name) ? name : "",
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
